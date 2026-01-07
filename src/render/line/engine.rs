@@ -1,6 +1,8 @@
 #[cfg(feature = "signal-hook")]
 use std::sync::Arc;
 use std::{
+    borrow::Cow,
+    ffi::OsStr,
     io,
     ops::RangeInclusive,
     sync::atomic::{AtomicBool, Ordering},
@@ -8,6 +10,38 @@ use std::{
 };
 
 use crate::{progress, render::line::draw, Throughput, WeakRoot};
+
+/// Return true if we should colorize the output, based on [clicolors spec](https://bixense.com/clicolors/) and [no-color spec](https://no-color.org)
+///
+/// Note that you should also validate that the output stream is actually connected to a terminal.
+fn color_allowed() -> bool {
+    allow_clicolors_spec() && allow_by_no_color_spec()
+}
+
+fn evar_with_default<'a>(name: &str, default: &'a str) -> Cow<'a, OsStr> {
+    std::env::var_os(name)
+        .map(Cow::from)
+        .unwrap_or_else(|| Cow::Borrowed(OsStr::new(default)))
+}
+
+fn evar_equals(var: Cow<OsStr>, want: &str) -> bool {
+    var == Cow::Borrowed(OsStr::new(want))
+}
+
+fn evar_not_equals(var: Cow<OsStr>, want: &str) -> bool {
+    var != Cow::Borrowed(OsStr::new(want))
+}
+
+// https://bixense.com/clicolors/
+fn allow_clicolors_spec() -> bool {
+    evar_equals(evar_with_default("CLICOLOR", "1"), "1")
+        || evar_not_equals(evar_with_default("CLICOLOR_FORCE", "0"), "0")
+}
+
+// https://no-color.org
+fn allow_by_no_color_spec() -> bool {
+    std::env::var_os("NO_COLOR").is_none()
+}
 
 /// Options used for configuring a [line renderer][render()].
 #[derive(Clone)]
@@ -17,7 +51,7 @@ pub struct Options {
     /// If false, we won't print any live progress, only log messages.
     pub output_is_terminal: bool,
 
-    /// If true, _(default: true)_ we will display color. You should use `output_is_terminal && crosstermion::should_colorize()`
+    /// If true, _(default: true)_ we will display color. You should use `output_is_terminal && color_allowed()`
     /// to determine this value.
     ///
     /// Please note that you can enforce color even if the output stream is not connected to a terminal by setting
@@ -88,8 +122,8 @@ impl Options {
             StreamKind::Stdout => is_terminal::is_terminal(std::io::stdout()),
             StreamKind::Stderr => is_terminal::is_terminal(std::io::stderr()),
         };
-        self.colored = self.output_is_terminal && crosstermion::color::allowed();
-        self.terminal_dimensions = crosstermion::terminal::size().unwrap_or((80, 20));
+        self.colored = self.output_is_terminal && color_allowed();
+        self.terminal_dimensions = crossterm::terminal::size().unwrap_or((80, 20));
         #[cfg(feature = "signal-hook")]
         self.auto_hide_cursor();
         self
@@ -261,7 +295,7 @@ pub fn render(
                             }
                             if terminal_resized.load(Ordering::SeqCst) {
                                 terminal_resized.store(false, Ordering::SeqCst);
-                                if let Ok((x, y)) = crosstermion::terminal::size() {
+                                if let Ok((x, y)) = crossterm::terminal::size() {
                                     tick_send.send(Event::Resize(x, y)).ok();
                                 }
                             }
@@ -305,7 +339,7 @@ pub fn render(
                 }
 
                 if show_cursor {
-                    crosstermion::execute!(out, crosstermion::cursor::Show).ok();
+                    crossterm::execute!(out, crossterm::cursor::Show).ok();
                 }
 
                 // One day we might try this out on windows, but let's not risk it now.
@@ -327,7 +361,7 @@ pub fn render(
 #[allow(unused_mut)]
 fn possibly_hide_cursor(out: &mut impl io::Write, mut hide_cursor: bool) -> bool {
     if hide_cursor {
-        crosstermion::execute!(out, crosstermion::cursor::Hide).is_ok()
+        crossterm::execute!(out, crossterm::cursor::Hide).is_ok()
     } else {
         false
     }

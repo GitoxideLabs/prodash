@@ -6,10 +6,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crosstermion::{
-    ansi_term::{ANSIString, ANSIStrings, Color, Style},
-    color,
-};
+use ansi_term::{ANSIString, ANSIStrings, Color, Style};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -17,6 +14,37 @@ use crate::{
     progress::{self, Value},
     unit, Root, Throughput,
 };
+
+/// A utility struct to conditionally apply ANSI styles based on whether coloring is enabled.
+struct Brush {
+    may_paint: bool,
+    style: Option<Style>,
+}
+
+impl Brush {
+    fn new(colored: bool) -> Self {
+        Brush {
+            may_paint: colored,
+            style: None,
+        }
+    }
+
+    fn style(&mut self, style: Style) -> &mut Self {
+        self.style = Some(style);
+        self
+    }
+
+    #[must_use]
+    fn paint<'a, S>(&mut self, input: S) -> ANSIString<'a>
+    where
+        S: Into<std::borrow::Cow<'a, str>>,
+    {
+        match (self.may_paint, self.style.take()) {
+            (true, Some(style)) => style.paint(input),
+            _ => ANSIString::from(input),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct State {
@@ -71,7 +99,7 @@ fn messages(
     max_height: usize,
     timestamp: bool,
 ) -> io::Result<()> {
-    let mut brush = color::Brush::new(colored);
+    let mut brush = Brush::new(colored);
     fn to_color(level: MessageLevel) -> Color {
         use crate::messages::MessageLevel::*;
         match level {
@@ -196,10 +224,10 @@ pub fn all(out: &mut impl io::Write, show_progress: bool, state: &mut State, con
                 writeln!(out, "{:>width$}", "", width = *blocks_in_last_iteration as usize)?;
             }
             // Move cursor back to end of the portion we have actually drawn
-            crosstermion::execute!(out, crosstermion::cursor::MoveUp(state.blocks_per_line.len() as u16))?;
+            crossterm::execute!(out, crossterm::cursor::MoveUp(state.blocks_per_line.len() as u16))?;
             state.blocks_per_line.resize(lines_drawn, 0);
         } else if lines_drawn > 0 {
-            crosstermion::execute!(out, crosstermion::cursor::MoveUp(lines_drawn as u16))?;
+            crossterm::execute!(out, crossterm::cursor::MoveUp(lines_drawn as u16))?;
         }
     }
     Ok(())
@@ -231,7 +259,7 @@ fn block_count_sans_ansi_codes(strings: &[ANSIString<'_>]) -> u16 {
 }
 
 fn draw_progress_bar(p: &Value, style: Style, mut blocks_available: u16, colored: bool, buf: &mut Vec<ANSIString<'_>>) {
-    let mut brush = color::Brush::new(colored);
+    let mut brush = Brush::new(colored);
     let styled_brush = brush.style(style);
 
     blocks_available = blocks_available.saturating_sub(3); // account for…I don't really know it's magic
@@ -292,7 +320,7 @@ fn format_progress<'a>(
     throughput: Option<unit::display::Throughput>,
     buf: &mut Vec<ANSIString<'a>>,
 ) -> Option<u16> {
-    let mut brush = color::Brush::new(colored);
+    let mut brush = Brush::new(colored);
     buf.clear();
 
     buf.push(Style::new().paint(format!("{:>level$}", "", level = key.level() as usize)));

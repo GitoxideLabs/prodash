@@ -92,11 +92,59 @@ pub(crate) enum InterruptDrawInfo {
 #[cfg(not(any(feature = "render-tui-crossterm")))]
 compile_error!("Please set the 'render-tui-crossterm' feature when using the 'render-tui'");
 
-use crosstermion::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
-use crosstermion::{
-    input::{key_input_stream, Key},
-    terminal::{tui::new_terminal, AlternateRawScreen},
+use crossterm::event::{KeyCode, KeyEvent as Key, KeyEventKind, KeyModifiers};
+use crossterm::{
+    execute,
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
+
+/// A utility writer to activate an alternate screen in raw mode on instantiation, and resets to previous settings on drop.
+struct AlternateRawScreen<T: std::io::Write> {
+    inner: T,
+}
+
+impl<T: std::io::Write> AlternateRawScreen<T> {
+    fn try_from(mut write: T) -> Result<Self, std::io::Error> {
+        terminal::enable_raw_mode()?;
+        execute!(write, EnterAlternateScreen)?;
+        Ok(AlternateRawScreen { inner: write })
+    }
+}
+
+impl<T: std::io::Write> std::io::Write for AlternateRawScreen<T> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<T: std::io::Write> Drop for AlternateRawScreen<T> {
+    fn drop(&mut self) {
+        terminal::disable_raw_mode().ok();
+        execute!(self.inner, LeaveAlternateScreen).ok();
+    }
+}
+
+fn new_terminal<W: std::io::Write>(
+    write: W,
+) -> Result<tui_react::Terminal<tui::backend::CrosstermBackend<W>>, std::io::Error> {
+    let backend = tui::backend::CrosstermBackend::new(write);
+    Ok(tui_react::Terminal::new(backend)?)
+}
+
+/// Return a stream of key input Events
+fn key_input_stream() -> impl futures_core::stream::Stream<Item = Key> {
+    use futures_lite::StreamExt;
+    crossterm::event::EventStream::new()
+        .filter_map(|r| r.ok())
+        .filter_map(|e| match e {
+            crossterm::event::Event::Key(key) => Some(key),
+            _ => None,
+        })
+}
 
 /// An event to be sent in the [`tui::render_with_input(…events)`](./fn.render_with_input.html) stream.
 ///
