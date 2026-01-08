@@ -343,7 +343,7 @@ fn draw_progress_bar_fn(
     let color = style(fraction);
     for y in fractional_progress_rect.top()..fractional_progress_rect.bottom() {
         for x in fractional_progress_rect.left()..fractional_progress_rect.right() {
-            let cell = buf.get_mut(x, y);
+            let cell = &mut buf[(x, y)];
             cell.set_fg(color);
             cell.set_symbol(tui::symbols::block::FULL);
         }
@@ -364,7 +364,7 @@ fn draw_progress_bar_fn(
         let index = ((((bound.width as f32 * fraction) - fractional_progress_rect.width as f32) * 8f32).round()
             as usize)
             % BLOCK_SECTIONS.len();
-        let cell = buf.get_mut(fractional_progress_rect.right(), bound.y);
+        let cell = &mut buf[(fractional_progress_rect.right(), bound.y)];
         cell.set_symbol(BLOCK_SECTIONS[index]);
         cell.set_fg(color);
         fractional_progress_rect.width += 1;

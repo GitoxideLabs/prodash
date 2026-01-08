@@ -227,7 +227,7 @@ fn newline_with_overdraw(
 }
 
 fn block_count_sans_ansi_codes(strings: &[AnsiString<'_>]) -> u16 {
-    strings.iter().map(|s| s.width() as u16).sum()
+    strings.iter().map(|s| s.as_str().width() as u16).sum()
 }
 
 fn draw_progress_bar(p: &Value, style: Style, mut blocks_available: u16, colored: bool, buf: &mut Vec<AnsiString<'_>>) {

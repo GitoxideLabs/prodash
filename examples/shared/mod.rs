@@ -169,7 +169,7 @@ fn window_resize_stream(animate: bool) -> impl futures_core::Stream<Item = Event
                 width: width.saturating_sub(*ofs_x).max(min_size),
                 height: height.saturating_sub(*ofs_y).max(min_size),
             };
-            if bound.area() <= min_size * min_size || bound.area() == width * height {
+            if bound.area() <= u32::from(min_size) * u32::from(min_size) || bound.area() == u32::from(width) * u32::from(height) {
                 direction = match direction {
                     Direction::Grow => Direction::Shrink,
                     Direction::Shrink => Direction::Grow,
