@@ -45,6 +45,22 @@ jobs:
     - name: Check the base crate on the declared MSRV
       run: cargo "+$MSRV" check --locked --lib
 
+  all-features-floor:
+    runs-on: ubuntu-latest
+    env:
+      # Not the MSRV. `rust-version` covers the base crate, while optional features can
+      # need newer compilers through their optional dependencies. This value is one
+      # release too low on purpose, to show the job failing when the floor is wrong.
+      ALL_FEATURES_FLOOR: "1.87.0"
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install the all-features floor toolchain
+      run: rustup toolchain install "$ALL_FEATURES_FLOOR" --profile minimal --no-self-update
+    - name: Check every feature at once
+      run: cargo "+$ALL_FEATURES_FLOOR" check --locked --all-features
+
   build-and-test-linux:
     runs-on: ubuntu-latest
     steps:
