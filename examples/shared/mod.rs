@@ -1,4 +1,4 @@
-use std::{ops::RangeInclusive, sync::Arc, time::Duration};
+use std::{io::IsTerminal, ops::RangeInclusive, sync::Arc, time::Duration};
 
 use futures_util::{future::FutureExt, stream::StreamExt};
 use prodash::{
@@ -54,7 +54,7 @@ pub fn launch_ambient_gui(
         }
         .boxed(),
         "tui" => {
-            if !is_terminal::is_terminal(std::io::stdout()) {
+            if !std::io::stdout().is_terminal() {
                 eprintln!("Need a terminal on stdout to draw progress TUI");
                 futures_lite::future::ready(()).boxed()
             } else {

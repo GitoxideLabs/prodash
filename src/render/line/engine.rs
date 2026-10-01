@@ -84,9 +84,10 @@ impl Options {
     /// * hide-cursor (based on presence of 'signal-hook' feature.
     #[cfg(feature = "render-line-autoconfigure")]
     pub fn auto_configure(mut self, output: StreamKind) -> Self {
+        use std::io::IsTerminal;
         self.output_is_terminal = match output {
-            StreamKind::Stdout => is_terminal::is_terminal(std::io::stdout()),
-            StreamKind::Stderr => is_terminal::is_terminal(std::io::stderr()),
+            StreamKind::Stdout => std::io::stdout().is_terminal(),
+            StreamKind::Stderr => std::io::stderr().is_terminal(),
         };
         self.colored = self.output_is_terminal && crosstermion::color::allowed();
         self.terminal_dimensions = crosstermion::terminal::size().unwrap_or((80, 20));
