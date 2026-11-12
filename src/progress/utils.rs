@@ -287,16 +287,16 @@ use std::time::Instant;
 use crate::progress::{Step, StepShared};
 
 /// Emit a message with throughput information when the instance is dropped.
-pub struct ThroughputOnDrop<T: NestedProgress>(T, Instant);
+pub struct ThroughputOnDrop<T: Progress>(T, Instant);
 
-impl<T: NestedProgress> ThroughputOnDrop<T> {
-    /// Create a new instance by providing the `inner` [`NestedProgress`] implementation.
+impl<T: Progress> ThroughputOnDrop<T> {
+    /// Create a new instance by providing the `inner` [`Progress`] implementation.
     pub fn new(inner: T) -> Self {
         ThroughputOnDrop(inner, Instant::now())
     }
 }
 
-impl<T: NestedProgress> Count for ThroughputOnDrop<T> {
+impl<T: Progress> Count for ThroughputOnDrop<T> {
     fn set(&self, step: usize) {
         self.0.set(step)
     }
@@ -314,7 +314,7 @@ impl<T: NestedProgress> Count for ThroughputOnDrop<T> {
     }
 }
 
-impl<T: NestedProgress> Progress for ThroughputOnDrop<T> {
+impl<T: Progress> Progress for ThroughputOnDrop<T> {
     fn init(&mut self, max: Option<usize>, unit: Option<Unit>) {
         self.0.init(max, unit)
     }
@@ -360,7 +360,7 @@ impl<T: NestedProgress> NestedProgress for ThroughputOnDrop<T> {
     }
 }
 
-impl<T: NestedProgress> Drop for ThroughputOnDrop<T> {
+impl<T: Progress> Drop for ThroughputOnDrop<T> {
     fn drop(&mut self) {
         self.0.show_throughput(self.1)
     }
